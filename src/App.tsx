@@ -1,0 +1,355 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Chess } from 'chess.js';
+import { Chessboard } from 'react-chessboard';
+import { motion, AnimatePresence } from 'motion/react';
+import { 
+  BookOpen, 
+  ChevronRight, 
+  RotateCcw, 
+  RefreshCw,
+  Lightbulb, 
+  Trophy, 
+  History,
+  Info,
+  BrainCircuit,
+  ChevronLeft
+} from 'lucide-react';
+import Markdown from 'react-markdown';
+import { OPENINGS, Opening } from './constants/openings';
+import { explainOpeningMove, getOpeningSuggestions } from './services/gemini';
+
+const Board = Chessboard as any;
+
+export default function App() {
+  const [game, setGame] = useState(new Chess());
+  const [selectedOpening, setSelectedOpening] = useState<Opening | null>(null);
+  const [explanation, setExplanation] = useState<string>("");
+  const [loading, setLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [moveIndex, setMoveIndex] = useState(0);
+  const [showHistory, setShowHistory] = useState(true);
+  const [boardOrientation, setBoardOrientation] = useState<'white' | 'black'>('white');
+
+  const boardContainerRef = useRef<HTMLDivElement>(null);
+  const [boardWidth, setBoardWidth] = useState(400);
+
+  // Handle responsive board size
+  useEffect(() => {
+    const observer = new ResizeObserver((entries) => {
+      if (entries[0]) {
+        const width = entries[0].contentRect.width;
+        setBoardWidth(Math.min(width, 600));
+      }
+    });
+
+    if (boardContainerRef.current) {
+      observer.observe(boardContainerRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
+  const makeAMove = useCallback((move: any) => {
+    try {
+      const result = game.move(move);
+      if (result) {
+        setGame(new Chess(game.fen()));
+        return true;
+      }
+    } catch (e) {
+      return false;
+    }
+    return false;
+  }, [game]);
+
+  const onDrop = (sourceSquare: string, targetSquare: string) => {
+    const move = makeAMove({
+      from: sourceSquare,
+      to: targetSquare,
+      promotion: "q", // always promote to queen for simplicity
+    });
+
+    if (move) {
+      handleMoveEffect();
+      return true;
+    }
+    return false;
+  };
+
+  const handleMoveEffect = async () => {
+    setLoading(true);
+    const history = game.history();
+    const fen = game.fen();
+    
+    // Get explanation from Gemini
+    const exp = await explainOpeningMove(selectedOpening?.name || "Unknown Opening", history, fen);
+    setExplanation(exp || "");
+    
+    // Get suggestions
+    const sug = await getOpeningSuggestions(fen);
+    setSuggestions(sug);
+    
+    setLoading(false);
+  };
+
+  const resetGame = () => {
+    setGame(new Chess());
+    setExplanation("");
+    setSuggestions([]);
+    setSelectedOpening(null);
+    setMoveIndex(0);
+  };
+
+  const loadOpening = (opening: Opening) => {
+    const newGame = new Chess();
+    opening.moves.forEach(move => newGame.move(move));
+    setGame(newGame);
+    setSelectedOpening(opening);
+    setMoveIndex(opening.moves.length);
+    setBoardOrientation(opening.side);
+    handleMoveEffect();
+  };
+
+  const undoMove = () => {
+    game.undo();
+    setGame(new Chess(game.fen()));
+    handleMoveEffect();
+  };
+
+  return (
+    <div className="min-h-screen bg-[#E4E3E0] text-[#141414] font-sans selection:bg-[#141414] selection:text-[#E4E3E0]">
+      {/* Header */}
+      <header className="border-b border-[#141414] p-6 flex justify-between items-center bg-white/50 backdrop-blur-sm sticky top-0 z-50">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-[#141414] rounded-lg">
+            <Trophy className="text-[#E4E3E0] w-6 h-6" />
+          </div>
+          <h1 className="text-2xl font-serif italic font-bold tracking-tight">Chess Opening Master</h1>
+        </div>
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={resetGame}
+            className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#141414] hover:bg-[#141414] hover:text-[#E4E3E0] transition-all text-sm font-medium"
+          >
+            <RotateCcw size={16} />
+            Reset
+          </button>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-0 min-h-[calc(100vh-88px)]">
+        {/* Left Sidebar: Openings */}
+        <aside className="lg:col-span-3 border-r border-[#141414] bg-white/30 overflow-y-auto max-h-[calc(100vh-88px)]">
+          <div className="p-6">
+            <div className="flex items-center gap-2 mb-6 opacity-50">
+              <BookOpen size={18} />
+              <span className="text-xs font-mono uppercase tracking-widest">Library</span>
+            </div>
+            
+            <div className="space-y-8">
+              <div>
+                <h3 className="text-xs font-mono uppercase tracking-widest mb-4 opacity-50">White Openings</h3>
+                <div className="space-y-2">
+                  {OPENINGS.filter(o => o.side === 'white').map(opening => (
+                    <button
+                      key={opening.name}
+                      onClick={() => loadOpening(opening)}
+                      className={`w-full text-left p-3 rounded-xl border transition-all flex items-center justify-between group ${
+                        selectedOpening?.name === opening.name 
+                        ? 'bg-[#141414] text-[#E4E3E0] border-[#141414]' 
+                        : 'border-transparent hover:border-[#141414]/20 hover:bg-white'
+                      }`}
+                    >
+                      <span className="font-medium">{opening.name}</span>
+                      <ChevronRight size={16} className={`transition-transform ${selectedOpening?.name === opening.name ? 'translate-x-1' : 'opacity-0 group-hover:opacity-100'}`} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-xs font-mono uppercase tracking-widest mb-4 opacity-50">Black Openings</h3>
+                <div className="space-y-2">
+                  {OPENINGS.filter(o => o.side === 'black').map(opening => (
+                    <button
+                      key={opening.name}
+                      onClick={() => loadOpening(opening)}
+                      className={`w-full text-left p-3 rounded-xl border transition-all flex items-center justify-between group ${
+                        selectedOpening?.name === opening.name 
+                        ? 'bg-[#141414] text-[#E4E3E0] border-[#141414]' 
+                        : 'border-transparent hover:border-[#141414]/20 hover:bg-white'
+                      }`}
+                    >
+                      <span className="font-medium">{opening.name}</span>
+                      <ChevronRight size={16} className={`transition-transform ${selectedOpening?.name === opening.name ? 'translate-x-1' : 'opacity-0 group-hover:opacity-100'}`} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        {/* Center: Board */}
+        <section className="lg:col-span-5 p-8 flex flex-col items-center justify-start bg-white/10" ref={boardContainerRef}>
+          <div className="w-full max-w-[600px] aspect-square shadow-2xl rounded-lg overflow-hidden border-4 border-[#141414]">
+            <Board 
+              key={boardOrientation}
+              id="basicBoard"
+              position={game.fen()} 
+              onPieceDrop={onDrop}
+              boardWidth={boardWidth}
+              boardOrientation={boardOrientation}
+              orientation={boardOrientation}
+              customDarkSquareStyle={{ backgroundColor: '#141414' }}
+              customLightSquareStyle={{ backgroundColor: '#E4E3E0' }}
+            />
+          </div>
+
+          <div className="mt-8 w-full max-w-[600px] flex justify-between items-center">
+            <div className="flex gap-2">
+              <button 
+                onClick={undoMove}
+                className="p-3 rounded-full border border-[#141414] hover:bg-[#141414] hover:text-[#E4E3E0] transition-all"
+                title="Undo Move"
+              >
+                <ChevronLeft size={20} />
+              </button>
+              <button 
+                className="p-3 rounded-full border border-[#141414] hover:bg-[#141414] hover:text-[#E4E3E0] transition-all"
+                title="Hint"
+                onClick={() => handleMoveEffect()}
+              >
+                <Lightbulb size={20} />
+              </button>
+              <button 
+                className="p-3 rounded-full border border-[#141414] hover:bg-[#141414] hover:text-[#E4E3E0] transition-all"
+                title="Flip Board"
+                onClick={() => setBoardOrientation(prev => prev === 'white' ? 'black' : 'white')}
+              >
+                <RefreshCw size={20} />
+              </button>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              <span className="text-[10px] font-mono uppercase tracking-tighter opacity-30">View: {boardOrientation}</span>
+              <div className={`w-3 h-3 rounded-full ${game.turn() === 'w' ? 'bg-white border border-[#141414]' : 'bg-[#141414]'}`} />
+              <span className="text-sm font-mono uppercase tracking-widest font-bold">
+                {game.turn() === 'w' ? "White's Turn" : "Black's Turn"}
+              </span>
+            </div>
+          </div>
+        </section>
+
+        {/* Right Panel: AI & History */}
+        <aside className="lg:col-span-4 border-l border-[#141414] flex flex-col bg-white/30 overflow-hidden">
+          {/* Tabs */}
+          <div className="flex border-b border-[#141414]">
+            <button 
+              onClick={() => setShowHistory(false)}
+              className={`flex-1 py-4 text-xs font-mono uppercase tracking-widest transition-all ${!showHistory ? 'bg-[#141414] text-[#E4E3E0]' : 'hover:bg-white'}`}
+            >
+              Coach Analysis
+            </button>
+            <button 
+              onClick={() => setShowHistory(true)}
+              className={`flex-1 py-4 text-xs font-mono uppercase tracking-widest transition-all ${showHistory ? 'bg-[#141414] text-[#E4E3E0]' : 'hover:bg-white'}`}
+            >
+              Move History
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-6">
+            <AnimatePresence mode="wait">
+              {showHistory ? (
+                <motion.div 
+                  key="history"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-4"
+                >
+                  <div className="flex items-center gap-2 mb-4 opacity-50">
+                    <History size={16} />
+                    <span className="text-xs font-mono uppercase tracking-widest">Moves</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {game.history().map((move, i) => (
+                      <div key={i} className="flex items-center gap-3 p-2 rounded-lg border border-[#141414]/10 bg-white/50">
+                        <span className="text-[10px] font-mono opacity-30 w-4">{Math.floor(i/2) + 1}{i%2 === 0 ? '.' : '...'}</span>
+                        <span className="font-mono font-bold text-sm">{move}</span>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div 
+                  key="analysis"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-6"
+                >
+                  {selectedOpening && (
+                    <div className="p-4 rounded-2xl bg-[#141414] text-[#E4E3E0]">
+                      <h2 className="text-xl font-serif italic mb-2">{selectedOpening.name}</h2>
+                      <p className="text-sm opacity-80 leading-relaxed">{selectedOpening.description}</p>
+                    </div>
+                  )}
+
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 opacity-50">
+                      <BrainCircuit size={16} />
+                      <span className="text-xs font-mono uppercase tracking-widest">Coach Insights</span>
+                    </div>
+                    
+                    {loading ? (
+                      <div className="flex flex-col gap-3">
+                        <div className="h-4 w-full bg-[#141414]/5 rounded animate-pulse" />
+                        <div className="h-4 w-3/4 bg-[#141414]/5 rounded animate-pulse" />
+                        <div className="h-4 w-5/6 bg-[#141414]/5 rounded animate-pulse" />
+                      </div>
+                    ) : explanation ? (
+                      <div className="prose prose-sm prose-stone max-w-none">
+                        <Markdown>{explanation}</Markdown>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-12 text-center opacity-30">
+                        <Info size={48} strokeWidth={1} className="mb-4" />
+                        <p className="text-sm">Select an opening or make a move to get AI analysis.</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {suggestions.length > 0 && (
+                    <div className="space-y-4 pt-6 border-t border-[#141414]/10">
+                      <div className="flex items-center gap-2 opacity-50">
+                        <Lightbulb size={16} />
+                        <span className="text-xs font-mono uppercase tracking-widest">Theoretical Continuations</span>
+                      </div>
+                      <div className="space-y-3">
+                        {suggestions.map((s, i) => (
+                          <div key={i} className="p-3 rounded-xl border border-[#141414]/10 bg-white hover:border-[#141414] transition-all cursor-default">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="px-2 py-0.5 bg-[#141414] text-[#E4E3E0] text-[10px] font-mono rounded-full">{s.move}</span>
+                            </div>
+                            <p className="text-xs opacity-70 leading-relaxed">{s.explanation}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </aside>
+      </main>
+    </div>
+  );
+}
