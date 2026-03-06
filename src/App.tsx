@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Chess } from 'chess.js';
-import { Chessboard } from 'react-chessboard';
+import { Chessboard, PieceDropHandlerArgs } from 'react-chessboard';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   BookOpen, 
@@ -26,7 +26,9 @@ import { explainOpeningMove, getOpeningSuggestions } from './services/gemini';
 const Board = Chessboard as any;
 
 export default function App() {
-  const [game, setGame] = useState(new Chess());
+  const gameRef = useRef(new Chess());
+  const game = gameRef.current;
+  const [chessPosition, setChessPosition] = useState(game.fen());
   const [selectedOpening, setSelectedOpening] = useState<Opening | null>(null);
   const [explanation, setExplanation] = useState<string>("");
   const [loading, setLoading] = useState(false);
@@ -54,38 +56,43 @@ export default function App() {
     return () => observer.disconnect();
   }, []);
 
-  const makeAMove = useCallback((move: any) => {
-    try {
-      const result = game.move(move);
-      if (result) {
-        setGame(new Chess(game.fen()));
-        return true;
-      }
-    } catch (e) {
+    // handle piece drop
+  function onPieceDrop({
+    sourceSquare,
+    targetSquare
+  }: PieceDropHandlerArgs) {
+    // type narrow targetSquare potentially being null (e.g. if dropped off board)
+    if (!targetSquare) {
       return false;
     }
-    return false;
-  }, [game]);
 
-  const onDrop = (sourceSquare: string, targetSquare: string) => {
-    const move = makeAMove({
-      from: sourceSquare,
-      to: targetSquare,
-      promotion: "q", // always promote to queen for simplicity
-    });
+    // try to make the move according to chess.js logic
+    try {
+      game.move({
+        from: sourceSquare,
+        to: targetSquare,
+        promotion: 'q' // always promote to a queen for example simplicity
+      });
 
-    if (move) {
-      handleMoveEffect();
+      // update the position state upon successful move to trigger a re-render of the chessboard
+      setChessPosition(game.fen());
+
+      // return true as the move was successful
       return true;
+    } catch {
+      // return false as the move was not successful
+      return false;
     }
-    return false;
-  };
+  }
 
   const handleMoveEffect = async () => {
     setLoading(true);
     const history = game.history();
     const fen = game.fen();
-    
+
+    //update chessboard position
+    setChessPosition(fen);
+
     // Get explanation from Gemini
     const exp = await explainOpeningMove(selectedOpening?.name || "Unknown Opening", history, fen);
     setExplanation(exp || "");
@@ -98,7 +105,8 @@ export default function App() {
   };
 
   const resetGame = () => {
-    setGame(new Chess());
+    game.reset();
+    setChessPosition(new Chess().fen());
     setExplanation("");
     setSuggestions([]);
     setSelectedOpening(null);
@@ -108,7 +116,7 @@ export default function App() {
   const loadOpening = (opening: Opening) => {
     const newGame = new Chess();
     opening.moves.forEach(move => newGame.move(move));
-    setGame(newGame);
+    setChessPosition(newGame.fen());
     setSelectedOpening(opening);
     setMoveIndex(opening.moves.length);
     setBoardOrientation(opening.side);
@@ -117,8 +125,19 @@ export default function App() {
 
   const undoMove = () => {
     game.undo();
-    setGame(new Chess(game.fen()));
+    setChessPosition(game.fen());
     handleMoveEffect();
+  };
+
+  const chessboardOptions = {
+    position: chessPosition,
+    onPieceDrop,
+    key: {boardOrientation},
+    id: "basicBoard",
+    boardWidth: {boardWidth},
+    boardOrientation,
+    customDarkSquareStyle: { backgroundColor: '#141414' },
+    customLightSquareStyle: { backgroundColor: '#E4E3E0' }
   };
 
   return (
@@ -198,17 +217,9 @@ export default function App() {
         {/* Center: Board */}
         <section className="lg:col-span-5 p-8 flex flex-col items-center justify-start bg-white/10" ref={boardContainerRef}>
           <div className="w-full max-w-[600px] aspect-square shadow-2xl rounded-lg overflow-hidden border-4 border-[#141414]">
-            <Board 
-              key={boardOrientation}
-              id="basicBoard"
-              position={game.fen()} 
-              onPieceDrop={onDrop}
-              boardWidth={boardWidth}
-              boardOrientation={boardOrientation}
-              orientation={boardOrientation}
-              customDarkSquareStyle={{ backgroundColor: '#141414' }}
-              customLightSquareStyle={{ backgroundColor: '#E4E3E0' }}
-            />
+            { 
+              <Chessboard options={chessboardOptions} />
+            }
           </div>
 
           <div className="mt-8 w-full max-w-[600px] flex justify-between items-center">

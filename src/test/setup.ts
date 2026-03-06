@@ -9,10 +9,10 @@ class ResizeObserver {
 }
 window.ResizeObserver = ResizeObserver;
 
-// Mock Chessboard component since it uses canvas/complex DOM
-vi.mock('react-chessboard', () => ({
-  Chessboard: () => null,
-}));
+// Don't mock Chessboard component - we want to test the real implementation
+// vi.mock('react-chessboard', () => ({
+//   Chessboard: () => null,
+// }));
 
 // Mock Gemini API
 vi.mock('@google/genai', () => ({
