@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: chess_openings_db
+    environment:
+      POSTGRES_DB: chess_openings
+      POSTGRES_USER: chess_user
+      POSTGRES_PASSWORD: chess_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
