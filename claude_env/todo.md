@@ -15,6 +15,12 @@ _Work through these in order — each step unlocks the next._
 7. [x] Set up GCP project (Cloud Run, Secret Manager, Artifact Registry)
 8. [x] Write GitHub Actions CI workflow (lint + test + build on PRs)
 9. [x] Write GitHub Actions CD workflow (deploy to Cloud Run on merge to `dev`/`main`)
+10. [ ] Create Neon project + staging database — save connection string to GCP Secret Manager
+11. [ ] Create `chess-openings-master-services` GitHub repo
+12. [ ] Initialize Spring Boot project (Spring Web, Data JPA, Security, PostgreSQL driver, Flyway)
+13. [ ] Write Flyway migrations for MVP schema (`openings` table) + seed the 9 openings
+14. [ ] Implement `GET /api/openings` and `GET /api/openings/{id}` endpoints
+15. [ ] Create Spring Boot `Dockerfile` + add to CD workflow
 
 ---
 
