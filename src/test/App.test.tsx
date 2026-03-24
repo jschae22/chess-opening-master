@@ -13,6 +13,10 @@ vi.mock('../services/gemini', () => ({
   getOpeningSuggestions: vi.fn().mockResolvedValue([{ move: 'e4', explanation: 'Good move' }]),
 }));
 
+vi.mock('../services/openingsApi', () => ({
+  fetchOpenings: vi.fn().mockResolvedValue([]),
+}));
+
 // Helper to get square position based on board orientation
 const getSquarePosition = (square: string, orientation: 'white' | 'black') => {
   const file = square.charCodeAt(0) - 'a'.charCodeAt(0); // 0-7

@@ -20,8 +20,9 @@ import {
   ChevronLeft
 } from 'lucide-react';
 import Markdown from 'react-markdown';
-import { OPENINGS, Opening } from './constants/openings';
+import { Opening } from './constants/openings';
 import { explainOpeningMove, getOpeningSuggestions } from './services/gemini';
+import { fetchOpenings } from './services/openingsApi';
 
 const Board = Chessboard as any;
 
@@ -36,6 +37,14 @@ export default function App() {
   const [moveIndex, setMoveIndex] = useState(0);
   const [showHistory, setShowHistory] = useState(true);
   const [boardOrientation, setBoardOrientation] = useState<'white' | 'black'>('white');
+
+  const [openings, setOpenings] = useState<Opening[]>([]);
+
+  useEffect(() => {
+    fetchOpenings()
+      .then(setOpenings)
+      .catch(err => console.error('Failed to load openings:', err));
+  }, []);
 
   const boardContainerRef = useRef<HTMLDivElement>(null);
   const [boardWidth, setBoardWidth] = useState(400);
@@ -174,7 +183,7 @@ export default function App() {
               <div>
                 <h3 className="text-xs font-mono uppercase tracking-widest mb-4 opacity-50">White Openings</h3>
                 <div className="space-y-2">
-                  {OPENINGS.filter(o => o.side === 'white').map(opening => (
+                  {openings.filter(o => o.side === 'white').map(opening => (
                     <button
                       key={opening.name}
                       onClick={() => loadOpening(opening)}
@@ -194,7 +203,7 @@ export default function App() {
               <div>
                 <h3 className="text-xs font-mono uppercase tracking-widest mb-4 opacity-50">Black Openings</h3>
                 <div className="space-y-2">
-                  {OPENINGS.filter(o => o.side === 'black').map(opening => (
+                  {openings.filter(o => o.side === 'black').map(opening => (
                     <button
                       key={opening.name}
                       onClick={() => loadOpening(opening)}

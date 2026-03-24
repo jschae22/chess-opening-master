@@ -1,6 +1,6 @@
 # Chess Opening Master — To-Do List
 
-_Updated: 2026-03-18 (session 3)_
+_Updated: 2026-03-23 (session 4)_
 
 ## Current Sequence
 
@@ -15,12 +15,12 @@ _Work through these in order — each step unlocks the next._
 7. [x] Set up GCP project (Cloud Run, Secret Manager, Artifact Registry)
 8. [x] Write GitHub Actions CI workflow (lint + test + build on PRs)
 9. [x] Write GitHub Actions CD workflow (deploy to Cloud Run on merge to `dev`/`main`)
-10. [ ] Create Neon project + staging database — save connection string to GCP Secret Manager
-11. [ ] Create `chess-openings-master-services` GitHub repo
-12. [ ] Initialize Spring Boot project (Spring Web, Data JPA, Security, PostgreSQL driver, Flyway)
-13. [ ] Write Flyway migrations for MVP schema (`openings` table) + seed the 9 openings
-14. [ ] Implement `GET /api/openings` and `GET /api/openings/{id}` endpoints
-15. [ ] Create Spring Boot `Dockerfile` + add to CD workflow
+10. [x] Create Neon project + staging database — save connection string to GCP Secret Manager
+11. [x] Create `chess-openings-master-services` GitHub repo
+12. [x] Initialize Spring Boot project (Spring Web, Data JPA, Security, PostgreSQL driver, Flyway)
+13. [x] Write Flyway migrations for MVP schema (`openings` table) + seed the 9 openings
+14. [x] Implement `GET /api/openings` and `GET /api/openings/{id}` endpoints
+15. [x] Create Spring Boot `Dockerfile` + add to CD workflow
 
 ---
 
@@ -37,7 +37,7 @@ _Work through these in order — each step unlocks the next._
 
 ## Frontend (this repo)
 
-- [ ] Set up Vite proxy (`/api/*` → `http://localhost:8080`) for local backend dev
+- [x] Set up Vite proxy (`/api/*` → `http://localhost:8080`) for local backend dev
 - [ ] Replace `gemini.ts` direct calls with `/api/chat` and `/api/openings` fetch calls (post-backend)
 - [ ] Add opening detail page / variation navigation (currently single move sequence)
 - [ ] Improve move history panel UX
@@ -46,22 +46,22 @@ _Work through these in order — each step unlocks the next._
 
 ---
 
-## Backend (`chess-openings-master-services` repo — not yet started)
+## Backend (`chess-openings-master-services` repo)
 
-- [ ] Initialize Spring Boot project (Spring Web, Spring Data JPA, Spring Security, PostgreSQL driver)
-- [ ] Implement `openings` REST endpoints: `GET /api/openings`, `GET /api/openings/{id}`
+- [x] Initialize Spring Boot project (Spring Web, Spring Data JPA, Spring Security, PostgreSQL driver)
+- [x] Implement `openings` REST endpoints: `GET /api/openings`, `GET /api/openings/{id}`
 - [ ] Implement chat endpoint: `POST /api/chat` (wraps Gemini, holds server-side API key)
 - [ ] Implement auth endpoints: `POST /api/auth/register`, `POST /api/auth/login` (JWT response)
 - [ ] Protect chat endpoints with JWT auth (V1)
 - [ ] Write JUnit tests for service and controller layers
-- [ ] Create `application-local.yml` template (gitignored) with DB URL, Gemini key, JWT secret
+- [x] Create `application-local.yml` template (gitignored) with DB URL, Gemini key, JWT secret
 
 ---
 
 ## Database
 
-- [ ] Write Flyway (or Liquibase) migration scripts for MVP schema (`openings` table)
-- [ ] Write seed data migration with the 9 openings currently in `openings.ts`
+- [x] Write Flyway migration scripts for MVP schema (`openings` table)
+- [x] Write seed data migration with the 9 openings currently in `openings.ts`
 - [ ] Plan V1 schema migrations (`users`, `favorite_openings`, `chat_sessions`, `chat_messages`)
 
 ---
@@ -70,9 +70,9 @@ _Work through these in order — each step unlocks the next._
 
 - [x] Set up Docker Compose for local PostgreSQL 16 — _file created, pending first run after Docker Desktop install_
 - [x] Create `Dockerfile` for frontend (React/Vite → nginx static container)
-- [ ] Create `Dockerfile` for Spring Boot service
+- [x] Create `Dockerfile` for Spring Boot service
 - [x] **Database hosting decision (resolved):** Use Docker Compose locally + Neon free tier for staging. Migrate to Cloud SQL when real users warrant it. Migration path: `pg_dump` → `pg_restore` + swap JDBC URL in Secret Manager — no app code changes needed.
-- [ ] Set up Neon project for staging PostgreSQL
+- [x] Set up Neon project for staging PostgreSQL
 - [x] Set up GCP project (Cloud Run, Secret Manager, Artifact Registry) — _skip Cloud SQL for now_
 - [x] Write GitHub Actions CI workflow: lint + test + build on PRs
 - [x] Write GitHub Actions CD workflow: deploy to Cloud Run on merge to `dev` (staging) and `main` (prod)
