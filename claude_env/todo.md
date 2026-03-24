@@ -1,26 +1,20 @@
 # Chess Opening Master — To-Do List
 
-_Updated: 2026-03-23 (session 4)_
+_Updated: 2026-03-23 (session 4 — end of session)_
 
 ## Current Sequence
 
 _Work through these in order — each step unlocks the next._
 
-1. [x] Add GitHub MCP server
-2. [x] Create Docker Compose for local PostgreSQL 16
-3. [x] Install Docker Desktop + run `docker compose up -d` to start local DB
-4. [x] Add `@modelcontextprotocol/server-postgres` MCP (connect to local DB)
-5. [x] Decide Cloud SQL vs. cheaper DB host — **resolved: Neon for staging, Cloud SQL later**
-6. [x] Create frontend `Dockerfile` (React/Vite → nginx)
-7. [x] Set up GCP project (Cloud Run, Secret Manager, Artifact Registry)
-8. [x] Write GitHub Actions CI workflow (lint + test + build on PRs)
-9. [x] Write GitHub Actions CD workflow (deploy to Cloud Run on merge to `dev`/`main`)
-10. [x] Create Neon project + staging database — save connection string to GCP Secret Manager
-11. [x] Create `chess-openings-master-services` GitHub repo
-12. [x] Initialize Spring Boot project (Spring Web, Data JPA, Security, PostgreSQL driver, Flyway)
-13. [x] Write Flyway migrations for MVP schema (`openings` table) + seed the 9 openings
-14. [x] Implement `GET /api/openings` and `GET /api/openings/{id}` endpoints
-15. [x] Create Spring Boot `Dockerfile` + add to CD workflow
+1. [ ] Fix 18 pre-existing test failures in `App.test.tsx` — mock captures `props.options` not `props` directly; update assertions or refactor Chessboard props
+2. [ ] Design V1 auth flow — JWT lifecycle (storage, expiry, refresh), login/signup UX sketch
+3. [ ] Write Flyway V3 migration for V1 schema (`users`, `favorite_openings`, `chat_sessions`, `chat_messages`)
+4. [ ] Implement `POST /api/auth/register` and `POST /api/auth/login` (Spring Security + bcrypt + JWT)
+5. [ ] Write JUnit tests for auth service and controller layers
+6. [ ] Design AI coaching prompt strategy — system prompt content, context passed per request (opening, FEN, history), multi-turn chat plan
+7. [ ] Implement `POST /api/chat` on backend (Gemini call with server-side API key, JWT-protected)
+8. [ ] Wire frontend chat panel to `/api/chat` — replace direct `gemini.ts` calls
+9. [ ] Build login/signup UI in frontend — forms, JWT storage, auth state
 
 ---
 
@@ -28,8 +22,8 @@ _Work through these in order — each step unlocks the next._
 
 - [ ] **API contract** — Define REST endpoints for the backend (openings CRUD, chat session, auth). Document as OpenAPI/Swagger spec or simple markdown.
 - [ ] **AI coaching prompt design** — Decide on system prompt strategy: what context does the coach get per request? (opening name, move history, FEN, user message). Plan how to pass chat history to maintain conversation context.
-- [ ] **Frontend ↔ Backend migration plan** — Gemini calls currently live on the frontend. Plan the cutover: new `/api/chat` and `/api/openings` endpoints replace direct `gemini.ts` calls before V1.
-- [ ] **Openings data strategy** — Currently hardcoded in `constants/openings.ts`. Decide: seed the DB from this file, or curate data separately? Plan the seed script / migration.
+- [x] **Frontend ↔ Backend migration plan (openings done)** — `GET /api/openings` live; frontend fetches from backend. Remaining: `/api/chat` replaces `gemini.ts` (step 8 in sequence).
+- [x] **Openings data strategy** — Seeded directly from `constants/openings.ts` data via Flyway V2 migration.
 - [ ] **Error & loading UX** — Define how the UI handles backend downtime, slow AI responses, and invalid moves gracefully.
 - [ ] **V1 auth flow design** — Sketch the login/signup UX and JWT lifecycle (token storage, refresh strategy, logout).
 
@@ -62,7 +56,7 @@ _Work through these in order — each step unlocks the next._
 
 - [x] Write Flyway migration scripts for MVP schema (`openings` table)
 - [x] Write seed data migration with the 9 openings currently in `openings.ts`
-- [ ] Plan V1 schema migrations (`users`, `favorite_openings`, `chat_sessions`, `chat_messages`)
+- [x] Plan V1 schema migrations — defined in `claude_env/schema.md`; implementation is step 3 in current sequence
 
 ---
 
@@ -84,7 +78,7 @@ _Work through these in order — each step unlocks the next._
 ## MCP / Tooling Setup
 
 - [x] Add `@modelcontextprotocol/server-github` MCP to Claude Code config
-- [ ] Add `@modelcontextprotocol/server-postgres` MCP (useful once local DB is running)
+- [x] Add `@modelcontextprotocol/server-postgres` MCP (connected to local DB)
 - [ ] Review Claude Code hooks — consider a `PostToolUse` hook to auto-lint after file edits
 
 ---
