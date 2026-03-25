@@ -1,12 +1,12 @@
 # Chess Opening Master — To-Do List
 
-_Updated: 2026-03-23 (session 4 — end of session)_
+_Updated: 2026-03-25 (session 5 — end of session)_
 
 ## Current Sequence
 
 _Work through these in order — each step unlocks the next._
 
-1. [ ] Fix 18 pre-existing test failures in `App.test.tsx` — mock captures `props.options` not `props` directly; update assertions or refactor Chessboard props
+1. [x] Fix 18 pre-existing test failures in `App.test.tsx` — mock captures `props.options` not `props` directly; update assertions or refactor Chessboard props
 2. [ ] Design V1 auth flow — JWT lifecycle (storage, expiry, refresh), login/signup UX sketch
 3. [ ] Write Flyway V3 migration for V1 schema (`users`, `favorite_openings`, `chat_sessions`, `chat_messages`)
 4. [ ] Implement `POST /api/auth/register` and `POST /api/auth/login` (Spring Security + bcrypt + JWT)

@@ -141,12 +141,10 @@ export default function App() {
   const chessboardOptions = {
     position: chessPosition,
     onPieceDrop,
-    key: {boardOrientation},
     id: "basicBoard",
-    boardWidth: {boardWidth},
     boardOrientation,
-    customDarkSquareStyle: { backgroundColor: '#141414' },
-    customLightSquareStyle: { backgroundColor: '#E4E3E0' }
+    darkSquareStyle: { backgroundColor: '#141414' },
+    lightSquareStyle: { backgroundColor: '#E4E3E0' }
   };
 
   return (
@@ -226,8 +224,8 @@ export default function App() {
         {/* Center: Board */}
         <section className="lg:col-span-5 p-8 flex flex-col items-center justify-start bg-white/10" ref={boardContainerRef}>
           <div className="w-full max-w-[600px] aspect-square shadow-2xl rounded-lg overflow-hidden border-4 border-[#141414]">
-            { 
-              <Chessboard options={chessboardOptions} />
+            {
+              <Chessboard key={boardOrientation} options={chessboardOptions} />
             }
           </div>
 
