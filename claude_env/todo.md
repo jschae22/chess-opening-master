@@ -1,20 +1,22 @@
 # Chess Opening Master — To-Do List
 
-_Updated: 2026-03-25 (session 5 — end of session)_
+_Updated: 2026-03-26 (session 7)_
 
 ## Current Sequence
 
 _Work through these in order — each step unlocks the next._
 
-1. [x] Fix 18 pre-existing test failures in `App.test.tsx` — mock captures `props.options` not `props` directly; update assertions or refactor Chessboard props
-2. [ ] Design V1 auth flow — JWT lifecycle (storage, expiry, refresh), login/signup UX sketch
-3. [ ] Write Flyway V3 migration for V1 schema (`users`, `favorite_openings`, `chat_sessions`, `chat_messages`)
-4. [ ] Implement `POST /api/auth/register` and `POST /api/auth/login` (Spring Security + bcrypt + JWT)
-5. [ ] Write JUnit tests for auth service and controller layers
-6. [ ] Design AI coaching prompt strategy — system prompt content, context passed per request (opening, FEN, history), multi-turn chat plan
-7. [ ] Implement `POST /api/chat` on backend (Gemini call with server-side API key, JWT-protected)
-8. [ ] Wire frontend chat panel to `/api/chat` — replace direct `gemini.ts` calls
-9. [ ] Build login/signup UI in frontend — forms, JWT storage, auth state
+1. [x] Reduce Gemini API usage for MVP — remove all automated calls; Gemini is only invoked when the user explicitly submits a chat message. Remove `getOpeningSuggestions` calls entirely for now. Fix model name (`gemini-2.0-flash`).
+2. [ ] Configure GCP Secret Manager — add Gemini API key, Neon DB URL, JWT signing key
+3. [ ] Deploy backend to Cloud Run — verify it connects to Neon and `/api/openings` responds
+4. [ ] Set `VITE_API_BASE_URL` env var for production build; lock down Spring Boot CORS to frontend Cloud Run origin only
+5. [ ] Deploy frontend to Cloud Run — verify it loads and fetches openings from backend
+6. [ ] Add IP-based rate limiting on `/api/chat` (Bucket4j or Cloud Run ingress rules)
+7. [ ] Add security headers to nginx config (`X-Frame-Options`, `X-Content-Type-Options`, basic CSP)
+8. [ ] Set up Cloud Run error rate alert — notify on elevated 5xx responses
+9. [ ] Implement error/loading UX for backend downtime and slow/failed Gemini responses
+10. [ ] Add input length validation on `/api/chat` request body
+11. [ ] End-to-end smoke test on live URLs — openings load, moves play, AI coach responds
 
 ---
 
@@ -26,6 +28,7 @@ _Work through these in order — each step unlocks the next._
 - [x] **Openings data strategy** — Seeded directly from `constants/openings.ts` data via Flyway V2 migration.
 - [ ] **Error & loading UX** — Define how the UI handles backend downtime, slow AI responses, and invalid moves gracefully.
 - [ ] **V1 auth flow design** — Sketch the login/signup UX and JWT lifecycle (token storage, refresh strategy, logout).
+- [ ] **V1 privacy policy** — Write privacy policy covering PII collected via user accounts (username, chat history, favorites). Required before V1 goes live.
 
 ---
 

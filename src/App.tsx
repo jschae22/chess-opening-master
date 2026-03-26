@@ -7,36 +7,39 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Chess } from 'chess.js';
 import { Chessboard, PieceDropHandlerArgs } from 'react-chessboard';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  BookOpen, 
-  ChevronRight, 
-  RotateCcw, 
+import {
+  BookOpen,
+  ChevronRight,
+  RotateCcw,
   RefreshCw,
-  Lightbulb, 
-  Trophy, 
+  Trophy,
   History,
   Info,
   BrainCircuit,
-  ChevronLeft
+  ChevronLeft,
+  Send
 } from 'lucide-react';
 import Markdown from 'react-markdown';
 import { Opening } from './constants/openings';
-import { explainOpeningMove, getOpeningSuggestions } from './services/gemini';
+import { chatWithCoach } from './services/gemini';
 import { fetchOpenings } from './services/openingsApi';
 
 const Board = Chessboard as any;
+
+type ChatMessage = { role: 'user' | 'coach'; content: string };
 
 export default function App() {
   const gameRef = useRef(new Chess());
   const game = gameRef.current;
   const [chessPosition, setChessPosition] = useState(game.fen());
   const [selectedOpening, setSelectedOpening] = useState<Opening | null>(null);
-  const [explanation, setExplanation] = useState<string>("");
   const [loading, setLoading] = useState(false);
-  const [suggestions, setSuggestions] = useState<any[]>([]);
   const [moveIndex, setMoveIndex] = useState(0);
   const [showHistory, setShowHistory] = useState(true);
   const [boardOrientation, setBoardOrientation] = useState<'white' | 'black'>('white');
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const chatBottomRef = useRef<HTMLDivElement>(null);
 
   const [openings, setOpenings] = useState<Opening[]>([]);
 
@@ -64,6 +67,11 @@ export default function App() {
 
     return () => observer.disconnect();
   }, []);
+
+  // Scroll chat to bottom when new messages arrive
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatHistory]);
 
     // handle piece drop
   function onPieceDrop({
@@ -94,32 +102,37 @@ export default function App() {
     }
   }
 
-  const handleMoveEffect = async () => {
+  const sendChatMessage = async () => {
+    const message = chatInput.trim();
+    if (!message || loading) return;
+
+    setChatInput('');
+    setChatHistory(prev => [...prev, { role: 'user', content: message }]);
     setLoading(true);
-    const history = game.history();
-    const fen = game.fen();
 
-    //update chessboard position
-    setChessPosition(fen);
+    const response = await chatWithCoach(
+      selectedOpening?.name || '',
+      game.history(),
+      game.fen(),
+      message
+    );
 
-    // Get explanation from Gemini
-    const exp = await explainOpeningMove(selectedOpening?.name || "Unknown Opening", history, fen);
-    setExplanation(exp || "");
-    
-    // Get suggestions
-    const sug = await getOpeningSuggestions(fen);
-    setSuggestions(sug);
-    
+    setChatHistory(prev => [...prev, { role: 'coach', content: response || '' }]);
     setLoading(false);
+  };
+
+  const handleChatKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      sendChatMessage();
+    }
   };
 
   const resetGame = () => {
     game.reset();
     setChessPosition(new Chess().fen());
-    setExplanation("");
-    setSuggestions([]);
     setSelectedOpening(null);
     setMoveIndex(0);
+    setChatHistory([]);
   };
 
   const loadOpening = (opening: Opening) => {
@@ -129,13 +142,11 @@ export default function App() {
     setSelectedOpening(opening);
     setMoveIndex(opening.moves.length);
     setBoardOrientation(opening.side);
-    handleMoveEffect();
   };
 
   const undoMove = () => {
     game.undo();
     setChessPosition(game.fen());
-    handleMoveEffect();
   };
 
   const chessboardOptions = {
@@ -158,7 +169,7 @@ export default function App() {
           <h1 className="text-2xl font-serif italic font-bold tracking-tight">Chess Opening Master</h1>
         </div>
         <div className="flex items-center gap-4">
-          <button 
+          <button
             onClick={resetGame}
             className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#141414] hover:bg-[#141414] hover:text-[#E4E3E0] transition-all text-sm font-medium"
           >
@@ -176,7 +187,7 @@ export default function App() {
               <BookOpen size={18} />
               <span className="text-xs font-mono uppercase tracking-widest">Library</span>
             </div>
-            
+
             <div className="space-y-8">
               <div>
                 <h3 className="text-xs font-mono uppercase tracking-widest mb-4 opacity-50">White Openings</h3>
@@ -186,8 +197,8 @@ export default function App() {
                       key={opening.name}
                       onClick={() => loadOpening(opening)}
                       className={`w-full text-left p-3 rounded-xl border transition-all flex items-center justify-between group ${
-                        selectedOpening?.name === opening.name 
-                        ? 'bg-[#141414] text-[#E4E3E0] border-[#141414]' 
+                        selectedOpening?.name === opening.name
+                        ? 'bg-[#141414] text-[#E4E3E0] border-[#141414]'
                         : 'border-transparent hover:border-[#141414]/20 hover:bg-white'
                       }`}
                     >
@@ -206,8 +217,8 @@ export default function App() {
                       key={opening.name}
                       onClick={() => loadOpening(opening)}
                       className={`w-full text-left p-3 rounded-xl border transition-all flex items-center justify-between group ${
-                        selectedOpening?.name === opening.name 
-                        ? 'bg-[#141414] text-[#E4E3E0] border-[#141414]' 
+                        selectedOpening?.name === opening.name
+                        ? 'bg-[#141414] text-[#E4E3E0] border-[#141414]'
                         : 'border-transparent hover:border-[#141414]/20 hover:bg-white'
                       }`}
                     >
@@ -231,21 +242,14 @@ export default function App() {
 
           <div className="mt-8 w-full max-w-[600px] flex justify-between items-center">
             <div className="flex gap-2">
-              <button 
+              <button
                 onClick={undoMove}
                 className="p-3 rounded-full border border-[#141414] hover:bg-[#141414] hover:text-[#E4E3E0] transition-all"
                 title="Undo Move"
               >
                 <ChevronLeft size={20} />
               </button>
-              <button 
-                className="p-3 rounded-full border border-[#141414] hover:bg-[#141414] hover:text-[#E4E3E0] transition-all"
-                title="Hint"
-                onClick={() => handleMoveEffect()}
-              >
-                <Lightbulb size={20} />
-              </button>
-              <button 
+              <button
                 className="p-3 rounded-full border border-[#141414] hover:bg-[#141414] hover:text-[#E4E3E0] transition-all"
                 title="Flip Board"
                 onClick={() => setBoardOrientation(prev => prev === 'white' ? 'black' : 'white')}
@@ -253,7 +257,7 @@ export default function App() {
                 <RefreshCw size={20} />
               </button>
             </div>
-            
+
             <div className="flex items-center gap-4">
               <span className="text-[10px] font-mono uppercase tracking-tighter opacity-30">View: {boardOrientation}</span>
               <div className={`w-3 h-3 rounded-full ${game.turn() === 'w' ? 'bg-white border border-[#141414]' : 'bg-[#141414]'}`} />
@@ -264,17 +268,17 @@ export default function App() {
           </div>
         </section>
 
-        {/* Right Panel: AI & History */}
+        {/* Right Panel: AI Coach & History */}
         <aside className="lg:col-span-4 border-l border-[#141414] flex flex-col bg-white/30 overflow-hidden">
           {/* Tabs */}
           <div className="flex border-b border-[#141414]">
-            <button 
+            <button
               onClick={() => setShowHistory(false)}
               className={`flex-1 py-4 text-xs font-mono uppercase tracking-widest transition-all ${!showHistory ? 'bg-[#141414] text-[#E4E3E0]' : 'hover:bg-white'}`}
             >
-              Coach Analysis
+              AI Coach
             </button>
-            <button 
+            <button
               onClick={() => setShowHistory(true)}
               className={`flex-1 py-4 text-xs font-mono uppercase tracking-widest transition-all ${showHistory ? 'bg-[#141414] text-[#E4E3E0]' : 'hover:bg-white'}`}
             >
@@ -282,37 +286,38 @@ export default function App() {
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6">
-            <AnimatePresence mode="wait">
-              {showHistory ? (
-                <motion.div 
-                  key="history"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="space-y-4"
-                >
-                  <div className="flex items-center gap-2 mb-4 opacity-50">
-                    <History size={16} />
-                    <span className="text-xs font-mono uppercase tracking-widest">Moves</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {game.history().map((move, i) => (
-                      <div key={i} className="flex items-center gap-3 p-2 rounded-lg border border-[#141414]/10 bg-white/50">
-                        <span className="text-[10px] font-mono opacity-30 w-4">{Math.floor(i/2) + 1}{i%2 === 0 ? '.' : '...'}</span>
-                        <span className="font-mono font-bold text-sm">{move}</span>
-                      </div>
-                    ))}
-                  </div>
-                </motion.div>
-              ) : (
-                <motion.div 
-                  key="analysis"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="space-y-6"
-                >
+          <AnimatePresence mode="wait">
+            {showHistory ? (
+              <motion.div
+                key="history"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="flex-1 overflow-y-auto p-6 space-y-4"
+              >
+                <div className="flex items-center gap-2 mb-4 opacity-50">
+                  <History size={16} />
+                  <span className="text-xs font-mono uppercase tracking-widest">Moves</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {game.history().map((move, i) => (
+                    <div key={i} className="flex items-center gap-3 p-2 rounded-lg border border-[#141414]/10 bg-white/50">
+                      <span className="text-[10px] font-mono opacity-30 w-4">{Math.floor(i/2) + 1}{i%2 === 0 ? '.' : '...'}</span>
+                      <span className="font-mono font-bold text-sm">{move}</span>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="coach"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="flex-1 flex flex-col overflow-hidden"
+              >
+                {/* Scrollable chat area */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-4">
                   {selectedOpening && (
                     <div className="p-4 rounded-2xl bg-[#141414] text-[#E4E3E0]">
                       <h2 className="text-xl font-serif italic mb-2">{selectedOpening.name}</h2>
@@ -320,52 +325,75 @@ export default function App() {
                     </div>
                   )}
 
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 opacity-50">
-                      <BrainCircuit size={16} />
-                      <span className="text-xs font-mono uppercase tracking-widest">Coach Insights</span>
-                    </div>
-                    
-                    {loading ? (
-                      <div className="flex flex-col gap-3">
-                        <div className="h-4 w-full bg-[#141414]/5 rounded animate-pulse" />
-                        <div className="h-4 w-3/4 bg-[#141414]/5 rounded animate-pulse" />
-                        <div className="h-4 w-5/6 bg-[#141414]/5 rounded animate-pulse" />
-                      </div>
-                    ) : explanation ? (
-                      <div className="prose prose-sm prose-stone max-w-none">
-                        <Markdown>{explanation}</Markdown>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center py-12 text-center opacity-30">
-                        <Info size={48} strokeWidth={1} className="mb-4" />
-                        <p className="text-sm">Select an opening or make a move to get AI analysis.</p>
-                      </div>
-                    )}
+                  <div className="flex items-center gap-2 opacity-50">
+                    <BrainCircuit size={16} />
+                    <span className="text-xs font-mono uppercase tracking-widest">Coach</span>
                   </div>
 
-                  {suggestions.length > 0 && (
-                    <div className="space-y-4 pt-6 border-t border-[#141414]/10">
-                      <div className="flex items-center gap-2 opacity-50">
-                        <Lightbulb size={16} />
-                        <span className="text-xs font-mono uppercase tracking-widest">Theoretical Continuations</span>
+                  {chatHistory.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-12 text-center opacity-30">
+                      <Info size={48} strokeWidth={1} className="mb-4" />
+                      <p className="text-sm">Ask the coach anything about your position or opening.</p>
+                    </div>
+                  )}
+
+                  {chatHistory.map((msg, i) => (
+                    <div
+                      key={i}
+                      className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div
+                        className={`max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${
+                          msg.role === 'user'
+                            ? 'bg-[#141414] text-[#E4E3E0] rounded-br-sm'
+                            : 'bg-white border border-[#141414]/10 rounded-bl-sm prose prose-sm prose-stone max-w-none'
+                        }`}
+                      >
+                        {msg.role === 'coach' ? (
+                          <Markdown>{msg.content}</Markdown>
+                        ) : (
+                          msg.content
+                        )}
                       </div>
-                      <div className="space-y-3">
-                        {suggestions.map((s, i) => (
-                          <div key={i} className="p-3 rounded-xl border border-[#141414]/10 bg-white hover:border-[#141414] transition-all cursor-default">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="px-2 py-0.5 bg-[#141414] text-[#E4E3E0] text-[10px] font-mono rounded-full">{s.move}</span>
-                            </div>
-                            <p className="text-xs opacity-70 leading-relaxed">{s.explanation}</p>
-                          </div>
-                        ))}
+                    </div>
+                  ))}
+
+                  {loading && (
+                    <div className="flex justify-start">
+                      <div className="bg-white border border-[#141414]/10 rounded-2xl rounded-bl-sm px-4 py-3 flex gap-1.5">
+                        <span className="w-2 h-2 bg-[#141414]/30 rounded-full animate-bounce [animation-delay:0ms]" />
+                        <span className="w-2 h-2 bg-[#141414]/30 rounded-full animate-bounce [animation-delay:150ms]" />
+                        <span className="w-2 h-2 bg-[#141414]/30 rounded-full animate-bounce [animation-delay:300ms]" />
                       </div>
                     </div>
                   )}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+
+                  <div ref={chatBottomRef} />
+                </div>
+
+                {/* Chat input */}
+                <div className="border-t border-[#141414]/20 p-4 flex gap-2">
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={e => setChatInput(e.target.value)}
+                    onKeyDown={handleChatKeyDown}
+                    placeholder="Ask the coach..."
+                    disabled={loading}
+                    className="flex-1 px-4 py-2 rounded-full border border-[#141414]/20 bg-white text-sm outline-none focus:border-[#141414] transition-colors disabled:opacity-50"
+                  />
+                  <button
+                    onClick={sendChatMessage}
+                    disabled={loading || !chatInput.trim()}
+                    className="p-2.5 rounded-full bg-[#141414] text-[#E4E3E0] hover:opacity-80 transition-opacity disabled:opacity-30"
+                    title="Send message"
+                  >
+                    <Send size={16} />
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </aside>
       </main>
     </div>

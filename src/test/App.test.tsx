@@ -9,8 +9,7 @@ let capturedChessboardProps: any = null;
 
 // Mock the services to avoid actual API calls
 vi.mock('../services/gemini', () => ({
-  explainOpeningMove: vi.fn().mockResolvedValue('Mocked explanation'),
-  getOpeningSuggestions: vi.fn().mockResolvedValue([{ move: 'e4', explanation: 'Good move' }]),
+  chatWithCoach: vi.fn().mockResolvedValue('Mocked coach response'),
 }));
 
 vi.mock('../services/openingsApi', () => ({
