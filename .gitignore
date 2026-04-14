@@ -4,5 +4,8 @@ dist/
 coverage/
 .DS_Store
 *.log
+*-key.json
 .env*
 !.env.example
+claude_env/
+.claude/

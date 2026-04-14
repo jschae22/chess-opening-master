@@ -1,0 +1,55 @@
+name: CD
+
+on:
+  push:
+    branches: [main, dev]
+
+env:
+  PROJECT_ID: chess-openings-master
+  REGION: us-east1
+  IMAGE: us-east1-docker.pkg.dev/chess-openings-master/chess-images/frontend
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve service name
+        id: service
+        run: |
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            echo "name=chess-opening-master" >> $GITHUB_OUTPUT
+          else
+            echo "name=chess-opening-master-staging" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build & push image
+        run: |
+          docker build \
+            --build-arg GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }} \
+            -t ${{ env.IMAGE }}:${{ github.sha }} \
+            -t ${{ env.IMAGE }}:latest \
+            .
+          docker push ${{ env.IMAGE }}:${{ github.sha }}
+          docker push ${{ env.IMAGE }}:latest
+
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ steps.service.outputs.name }}
+          region: ${{ env.REGION }}
+          image: ${{ env.IMAGE }}:${{ github.sha }}
+          flags: >-
+            --allow-unauthenticated
+            --set-env-vars BACKEND_URL=https://chess-opening-master-services-qegqusavuq-ue.a.run.app
