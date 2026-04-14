@@ -2,13 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import App from '../App';
 import React from 'react';
+import { fetchOpenings } from '../services/openingsApi';
 
 // Track Chessboard component instantiations
 let chessboardInstances: any[] = [];
 let capturedChessboardProps: any = null;
 
 // Mock the services to avoid actual API calls
-vi.mock('../services/gemini', () => ({
+vi.mock('../services/chatApi', () => ({
   chatWithCoach: vi.fn().mockResolvedValue('Mocked coach response'),
 }));
 
@@ -92,6 +93,7 @@ describe('App Component', () => {
     // Reset tracking state before each test
     chessboardInstances = [];
     capturedChessboardProps = null;
+    vi.mocked(fetchOpenings).mockResolvedValue([]);
   });
   it('renders the application title', () => {
     render(<App />);
@@ -111,6 +113,24 @@ describe('App Component', () => {
     fireEvent.click(resetButton);
     // Should still show initial state
     expect(screen.getByText(/View: white/i)).toBeInTheDocument();
+  });
+
+  // ============ ERROR / LOADING UX TESTS ============
+
+  describe('Error and Loading UX', () => {
+    it('shows an error message in the sidebar when openings fail to load', async () => {
+      vi.mocked(fetchOpenings).mockRejectedValueOnce(new Error('Network error'));
+      render(<App />);
+      await waitFor(() => {
+        expect(screen.getByText(/Could not load openings/i)).toBeInTheDocument();
+      });
+    });
+
+    it('does not show an error message when openings load successfully', async () => {
+      render(<App />);
+      await act(async () => {});
+      expect(screen.queryByText(/Could not load openings/i)).not.toBeInTheDocument();
+    });
   });
 
   // ============ FLIP BUTTON TESTS ============

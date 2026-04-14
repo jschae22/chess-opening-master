@@ -7,3 +7,5 @@ coverage/
 *-key.json
 .env*
 !.env.example
+claude_env/
+.claude/

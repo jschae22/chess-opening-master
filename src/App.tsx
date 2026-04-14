@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import Markdown from 'react-markdown';
 import { Opening } from './constants/openings';
-import { chatWithCoach } from './services/gemini';
+import { chatWithCoach } from './services/chatApi';
 import { fetchOpenings } from './services/openingsApi';
 
 const Board = Chessboard as any;
@@ -42,11 +42,12 @@ export default function App() {
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
   const [openings, setOpenings] = useState<Opening[]>([]);
+  const [openingsError, setOpeningsError] = useState(false);
 
   useEffect(() => {
     fetchOpenings()
       .then(setOpenings)
-      .catch(err => console.error('Failed to load openings:', err));
+      .catch(() => setOpeningsError(true));
   }, []);
 
   const boardContainerRef = useRef<HTMLDivElement>(null);
@@ -110,15 +111,17 @@ export default function App() {
     setChatHistory(prev => [...prev, { role: 'user', content: message }]);
     setLoading(true);
 
-    const response = await chatWithCoach(
-      selectedOpening?.name || '',
-      game.history(),
-      game.fen(),
-      message
-    );
-
-    setChatHistory(prev => [...prev, { role: 'coach', content: response || '' }]);
-    setLoading(false);
+    try {
+      const response = await chatWithCoach(
+        selectedOpening?.name || '',
+        game.history(),
+        game.fen(),
+        message
+      );
+      setChatHistory(prev => [...prev, { role: 'coach', content: response || '' }]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleChatKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -187,6 +190,12 @@ export default function App() {
               <BookOpen size={18} />
               <span className="text-xs font-mono uppercase tracking-widest">Library</span>
             </div>
+
+            {openingsError && (
+              <div className="mb-6 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs">
+                Could not load openings. Please check your connection or try refreshing.
+              </div>
+            )}
 
             <div className="space-y-8">
               <div>
