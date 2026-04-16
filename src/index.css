@@ -1,1 +1,21 @@
 @import "tailwindcss";
+
+/* Colour tokens — automatically updated via prefers-color-scheme.
+   V1 TODO: expose board colour selection in user account settings so
+   players can choose from a range of board styles (classic wood, green
+   felt, blue marble, etc.) stored in their profile. */
+:root {
+  --ink: #141414;
+  --surface: #E4E3E0;
+  --board-dark: #6B6966;
+  --board-light: #E4E3E0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #E4E3E0;
+    --surface: #1C1C1A;
+    --board-dark: #4A4846;
+    --board-light: #8B8886;
+  }
+}

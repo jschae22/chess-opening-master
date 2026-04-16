@@ -2,7 +2,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import App from '../App';
 import React from 'react';
+import { Chess } from 'chess.js';
 import { fetchOpenings } from '../services/openingsApi';
+import type { Opening } from '../constants/openings';
+
+/** Compute the FEN produced by replaying a sequence of SAN moves from the starting position. */
+function fenAfter(...moves: string[]): string {
+  const g = new Chess();
+  for (const m of moves) g.move(m);
+  return g.fen();
+}
 
 // Track Chessboard component instantiations
 let chessboardInstances: any[] = [];
@@ -389,6 +398,326 @@ describe('App Component', () => {
         expect(capturedChessboardProps.boardOrientation).toBe('white');
       });
       expect(capturedChessboardProps.orientation).toBeUndefined();
+    });
+  });
+
+  // ============ BOARD COLOUR TESTS ============
+
+  describe('Board Colours', () => {
+    it('passes CSS variable references for dark and light square colours to Chessboard', () => {
+      capturedChessboardProps = null;
+      render(<App />);
+      expect(capturedChessboardProps.darkSquareStyle).toEqual({ backgroundColor: 'var(--board-dark)' });
+      expect(capturedChessboardProps.lightSquareStyle).toEqual({ backgroundColor: 'var(--board-light)' });
+    });
+  });
+
+  // ============ OPENING SELECTION TESTS ============
+
+  describe('Opening Selection', () => {
+    const WHITE_OPENING: Opening = {
+      name: 'Test White Opening',
+      description: 'A three-move white opening.',
+      side: 'white',
+      moves: ['e4', 'e5', 'Nf3'],
+    };
+    const BLACK_OPENING: Opening = {
+      name: 'Test Black Opening',
+      description: 'A two-move black opening.',
+      side: 'black',
+      moves: ['e4', 'c5'],
+    };
+    const STARTING_FEN = fenAfter();
+
+    beforeEach(() => {
+      vi.mocked(fetchOpenings).mockResolvedValue([WHITE_OPENING, BLACK_OPENING]);
+    });
+
+    async function clickOpening(name: string) {
+      capturedChessboardProps = null;
+      render(<App />);
+      await waitFor(() => expect(screen.getByText(name)).toBeInTheDocument());
+      await act(async () => { fireEvent.click(screen.getByText(name)); });
+    }
+
+    it('back button is disabled before any opening is loaded', async () => {
+      render(<App />);
+      await act(async () => {});
+      expect(screen.getByTitle(/Go Back/i)).toBeDisabled();
+    });
+
+    it('forward button is disabled before any opening is loaded', async () => {
+      render(<App />);
+      await act(async () => {});
+      expect(screen.getByTitle(/Go Forward/i)).toBeDisabled();
+    });
+
+    it('updates the board to the opening final position after selecting an opening', async () => {
+      await clickOpening('Test White Opening');
+      expect(capturedChessboardProps.position).toBe(fenAfter('e4', 'e5', 'Nf3'));
+    });
+
+    it('board position differs from the starting position after selecting an opening', async () => {
+      await clickOpening('Test White Opening');
+      expect(capturedChessboardProps.position).not.toBe(STARTING_FEN);
+    });
+
+    it('sets board orientation to white for a white-side opening', async () => {
+      await clickOpening('Test White Opening');
+      expect(capturedChessboardProps.boardOrientation).toBe('white');
+    });
+
+    it('sets board orientation to black for a black-side opening', async () => {
+      await clickOpening('Test Black Opening');
+      expect(capturedChessboardProps.boardOrientation).toBe('black');
+    });
+
+    it('populates the move history panel with each opening move', async () => {
+      await clickOpening('Test White Opening');
+      expect(screen.getByText('e4')).toBeInTheDocument();
+      expect(screen.getByText('e5')).toBeInTheDocument();
+      expect(screen.getByText('Nf3')).toBeInTheDocument();
+    });
+
+    it('shows the correct side to move after loading an opening', async () => {
+      // e4 e5 Nf3 ends with black to move
+      await clickOpening('Test White Opening');
+      expect(screen.getByText(/Black's Turn/)).toBeInTheDocument();
+    });
+
+    it('gameRef reflects the opening position so dropped pieces are validated correctly', async () => {
+      // After loading e4/e5/Nf3 it is black's turn — a white pawn move must be rejected
+      await clickOpening('Test White Opening');
+      const onDrop = capturedChessboardProps.onPieceDrop;
+      let accepted: boolean;
+      await act(async () => { accepted = onDrop({ sourceSquare: 'd2', targetSquare: 'd4' }); });
+      expect(accepted!).toBe(false); // white can't move when it's black's turn
+    });
+  });
+
+  // ============ BACK / FORWARD NAVIGATION TESTS ============
+
+  describe('Back/Forward Navigation', () => {
+    const OPENING: Opening = {
+      name: 'Nav Opening',
+      description: 'Navigation test opening.',
+      side: 'white',
+      moves: ['e4', 'e5', 'Nf3'],
+    };
+    const STARTING_FEN    = fenAfter();
+    const FEN_AFTER_1     = fenAfter('e4');
+    const FEN_AFTER_2     = fenAfter('e4', 'e5');
+    const FEN_AFTER_3     = fenAfter('e4', 'e5', 'Nf3');
+
+    beforeEach(() => {
+      vi.mocked(fetchOpenings).mockResolvedValue([OPENING]);
+    });
+
+    async function renderAndLoad() {
+      capturedChessboardProps = null;
+      render(<App />);
+      await waitFor(() => expect(screen.getByText('Nav Opening')).toBeInTheDocument());
+      await act(async () => { fireEvent.click(screen.getByText('Nav Opening')); });
+    }
+
+    it('back button is enabled after loading an opening', async () => {
+      await renderAndLoad();
+      expect(screen.getByTitle(/Go Back/i)).not.toBeDisabled();
+    });
+
+    it('forward button is disabled when at the latest move', async () => {
+      await renderAndLoad();
+      expect(screen.getByTitle(/Go Forward/i)).toBeDisabled();
+    });
+
+    it('going back one step shows the position after move 2', async () => {
+      await renderAndLoad();
+      await act(async () => { fireEvent.click(screen.getByTitle(/Go Back/i)); });
+      expect(capturedChessboardProps.position).toBe(FEN_AFTER_2);
+    });
+
+    it('going back two steps shows the position after move 1', async () => {
+      await renderAndLoad();
+      await act(async () => { fireEvent.click(screen.getByTitle(/Go Back/i)); });
+      await act(async () => { fireEvent.click(screen.getByTitle(/Go Back/i)); });
+      expect(capturedChessboardProps.position).toBe(FEN_AFTER_1);
+    });
+
+    it('going back three steps shows the starting position', async () => {
+      await renderAndLoad();
+      await act(async () => { fireEvent.click(screen.getByTitle(/Go Back/i)); });
+      await act(async () => { fireEvent.click(screen.getByTitle(/Go Back/i)); });
+      await act(async () => { fireEvent.click(screen.getByTitle(/Go Back/i)); });
+      expect(capturedChessboardProps.position).toBe(STARTING_FEN);
+    });
+
+    it('back button becomes disabled at the starting position', async () => {
+      await renderAndLoad();
+      await act(async () => { fireEvent.click(screen.getByTitle(/Go Back/i)); });
+      await act(async () => { fireEvent.click(screen.getByTitle(/Go Back/i)); });
+      await act(async () => { fireEvent.click(screen.getByTitle(/Go Back/i)); });
+      expect(screen.getByTitle(/Go Back/i)).toBeDisabled();
+    });
+
+    it('forward button becomes enabled after going back', async () => {
+      await renderAndLoad();
+      await act(async () => { fireEvent.click(screen.getByTitle(/Go Back/i)); });
+      expect(screen.getByTitle(/Go Forward/i)).not.toBeDisabled();
+    });
+
+    it('going forward after one back step returns to the opening final position', async () => {
+      await renderAndLoad();
+      await act(async () => { fireEvent.click(screen.getByTitle(/Go Back/i)); });
+      await act(async () => { fireEvent.click(screen.getByTitle(/Go Forward/i)); });
+      expect(capturedChessboardProps.position).toBe(FEN_AFTER_3);
+    });
+
+    it('forward button becomes disabled again after returning to the latest move', async () => {
+      await renderAndLoad();
+      await act(async () => { fireEvent.click(screen.getByTitle(/Go Back/i)); });
+      await act(async () => { fireEvent.click(screen.getByTitle(/Go Forward/i)); });
+      expect(screen.getByTitle(/Go Forward/i)).toBeDisabled();
+    });
+
+    it('can navigate all the way back and then all the way forward', async () => {
+      await renderAndLoad();
+      await act(async () => { fireEvent.click(screen.getByTitle(/Go Back/i)); });
+      await act(async () => { fireEvent.click(screen.getByTitle(/Go Back/i)); });
+      await act(async () => { fireEvent.click(screen.getByTitle(/Go Back/i)); });
+      expect(capturedChessboardProps.position).toBe(STARTING_FEN);
+
+      await act(async () => { fireEvent.click(screen.getByTitle(/Go Forward/i)); });
+      await act(async () => { fireEvent.click(screen.getByTitle(/Go Forward/i)); });
+      await act(async () => { fireEvent.click(screen.getByTitle(/Go Forward/i)); });
+      expect(capturedChessboardProps.position).toBe(FEN_AFTER_3);
+    });
+
+    it('all opening moves remain visible in the history panel when navigated back', async () => {
+      await renderAndLoad();
+      await act(async () => { fireEvent.click(screen.getByTitle(/Go Back/i)); });
+      expect(screen.getByText('e4')).toBeInTheDocument();
+      expect(screen.getByText('e5')).toBeInTheDocument();
+      expect(screen.getByText('Nf3')).toBeInTheDocument();
+    });
+
+    it('turn indicator reflects the position at the current history index', async () => {
+      await renderAndLoad(); // after Nf3 — black to move
+      expect(screen.getByText(/Black's Turn/)).toBeInTheDocument();
+      await act(async () => { fireEvent.click(screen.getByTitle(/Go Back/i)); }); // after e5 — white to move
+      expect(screen.getByText(/White's Turn/)).toBeInTheDocument();
+    });
+  });
+
+  // ============ BRANCHING TESTS ============
+
+  describe('Branching', () => {
+    const OPENING: Opening = {
+      name: 'Branch Opening',
+      description: 'Branching test opening.',
+      side: 'white',
+      moves: ['e4', 'e5', 'Nf3'],
+    };
+
+    beforeEach(() => {
+      vi.mocked(fetchOpenings).mockResolvedValue([OPENING]);
+    });
+
+    async function renderLoadAndGoBack() {
+      capturedChessboardProps = null;
+      render(<App />);
+      await waitFor(() => expect(screen.getByText('Branch Opening')).toBeInTheDocument());
+      await act(async () => { fireEvent.click(screen.getByText('Branch Opening')); });
+      // step back one so Nf3 is in the "future"
+      await act(async () => { fireEvent.click(screen.getByTitle(/Go Back/i)); });
+    }
+
+    it('forward button is enabled before branching (future move exists)', async () => {
+      await renderLoadAndGoBack();
+      expect(screen.getByTitle(/Go Forward/i)).not.toBeDisabled();
+    });
+
+    it('forward button is disabled after playing a new move from a historical position', async () => {
+      await renderLoadAndGoBack();
+      const onDrop = capturedChessboardProps.onPieceDrop;
+      // Play d4 instead of Nf3 (it is white's turn after e4/e5)
+      await act(async () => { onDrop({ sourceSquare: 'd2', targetSquare: 'd4' }); });
+      expect(screen.getByTitle(/Go Forward/i)).toBeDisabled();
+    });
+
+    it('the new branch move appears in the history after branching', async () => {
+      await renderLoadAndGoBack();
+      const onDrop = capturedChessboardProps.onPieceDrop;
+      await act(async () => { onDrop({ sourceSquare: 'd2', targetSquare: 'd4' }); });
+      expect(screen.getByText('d4')).toBeInTheDocument();
+    });
+
+    it('the old future move is removed from the history after branching', async () => {
+      await renderLoadAndGoBack();
+      // Nf3 should be visible as a "future" move before branching
+      expect(screen.getByText('Nf3')).toBeInTheDocument();
+      const onDrop = capturedChessboardProps.onPieceDrop;
+      await act(async () => { onDrop({ sourceSquare: 'd2', targetSquare: 'd4' }); });
+      // Nf3 should be gone after branching replaces it
+      expect(screen.queryByText('Nf3')).not.toBeInTheDocument();
+    });
+
+    it('the board reflects the new branch position after branching', async () => {
+      await renderLoadAndGoBack();
+      const onDrop = capturedChessboardProps.onPieceDrop;
+      await act(async () => { onDrop({ sourceSquare: 'd2', targetSquare: 'd4' }); });
+      expect(capturedChessboardProps.position).toBe(fenAfter('e4', 'e5', 'd4'));
+    });
+  });
+
+  // ============ RESET WITH HISTORY TESTS ============
+
+  describe('Reset with History', () => {
+    const OPENING: Opening = {
+      name: 'Reset Opening',
+      description: 'Reset test opening.',
+      side: 'white',
+      moves: ['e4', 'e5'],
+    };
+    const STARTING_FEN = fenAfter();
+
+    beforeEach(() => {
+      vi.mocked(fetchOpenings).mockResolvedValue([OPENING]);
+    });
+
+    async function renderAndLoad() {
+      capturedChessboardProps = null;
+      render(<App />);
+      await waitFor(() => expect(screen.getByText('Reset Opening')).toBeInTheDocument());
+      await act(async () => { fireEvent.click(screen.getByText('Reset Opening')); });
+    }
+
+    it('back button is disabled after resetting a game with history', async () => {
+      await renderAndLoad();
+      expect(screen.getByTitle(/Go Back/i)).not.toBeDisabled();
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Reset' })); });
+      expect(screen.getByTitle(/Go Back/i)).toBeDisabled();
+    });
+
+    it('forward button is disabled after resetting a game with history', async () => {
+      await renderAndLoad();
+      await act(async () => { fireEvent.click(screen.getByTitle(/Go Back/i)); });
+      expect(screen.getByTitle(/Go Forward/i)).not.toBeDisabled();
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Reset' })); });
+      expect(screen.getByTitle(/Go Forward/i)).toBeDisabled();
+    });
+
+    it('board returns to the starting position after reset', async () => {
+      await renderAndLoad();
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Reset' })); });
+      expect(capturedChessboardProps.position).toBe(STARTING_FEN);
+    });
+
+    it('move history is empty after reset', async () => {
+      await renderAndLoad();
+      expect(screen.getByText('e4')).toBeInTheDocument();
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Reset' })); });
+      expect(screen.queryByText('e4')).not.toBeInTheDocument();
+      expect(screen.queryByText('e5')).not.toBeInTheDocument();
     });
   });
 
