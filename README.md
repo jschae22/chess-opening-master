@@ -18,7 +18,7 @@ A chess website for players who want to learn and practice openings with the hel
 - JPA / Hibernate + PostgreSQL
 
 **AI**
-- Google Gemini 2.0 Flash via the backend — API key is never exposed to the browser
+- Anthropic Claude (Haiku 4.5) via the backend — API key is never exposed to the browser
 
 **Infrastructure (GCP)**
 - Cloud Run (containerized deployments)
@@ -42,11 +42,11 @@ nginx (static server + reverse proxy)
                                       │
                               ┌───────┴────────┐
                               │                │
-                         PostgreSQL       Gemini API
+                         PostgreSQL       Claude API
                          (Neon/Cloud SQL)  (server-side)
 ```
 
-The frontend is a static React app served by nginx inside a single Cloud Run container. API calls go through nginx as a reverse proxy to the Spring Boot backend service (a separate Cloud Run container). Gemini is called exclusively from the backend, keeping the API key out of the browser entirely.
+The frontend is a static React app served by nginx inside a single Cloud Run container. API calls go through nginx as a reverse proxy to the Spring Boot backend service (a separate Cloud Run container). Claude is called exclusively from the backend, keeping the API key out of the browser entirely.
 
 **Repositories**
 - Frontend: `chess-opening-master` (this repo)

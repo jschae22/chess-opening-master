@@ -37,7 +37,6 @@ jobs:
       - name: Build & push image
         run: |
           docker build \
-            --build-arg GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }} \
             -t ${{ env.IMAGE }}:${{ github.sha }} \
             -t ${{ env.IMAGE }}:latest \
             .

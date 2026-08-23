@@ -8,11 +8,6 @@ RUN npm ci
 
 COPY . .
 
-# GEMINI_API_KEY is baked into the static bundle at build time.
-# This will be removed once AI calls move to the backend (V1).
-ARG GEMINI_API_KEY
-ENV GEMINI_API_KEY=$GEMINI_API_KEY
-
 RUN npm run build
 
 # Stage 2: Serve

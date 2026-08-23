@@ -28,7 +28,3 @@ jobs:
 
       - name: Build
         run: npm run build
-        env:
-          # Real key is not needed for a build check — Gemini calls move to the
-          # backend before V1. A placeholder keeps Vite happy at build time.
-          GEMINI_API_KEY: placeholder
