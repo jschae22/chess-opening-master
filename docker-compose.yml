@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16
+    image: pgvector/pgvector:pg16
     container_name: chess_openings_db
     environment:
       POSTGRES_DB: chess_openings
