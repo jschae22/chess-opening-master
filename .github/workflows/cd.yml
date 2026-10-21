@@ -5,6 +5,11 @@ name: CD
 on:
   push:
     branches: [main]
+    # Docs-only merges don't change what runs in prod, so skip the redeploy.
+    paths-ignore:
+      - "**.md"
+      - ".github/CODEOWNERS"
+      - ".github/pull_request_template.md"
   workflow_dispatch:
 
 env:
@@ -47,6 +52,7 @@ jobs:
           docker push ${{ env.IMAGE }}:latest
 
       - name: Deploy to Cloud Run
+        id: deploy
         uses: google-github-actions/deploy-cloudrun@v2
         with:
           service: ${{ steps.service.outputs.name }}
@@ -55,3 +61,19 @@ jobs:
           flags: >-
             --allow-unauthenticated
             --set-env-vars BACKEND_URL=https://chess-opening-master-services-qegqusavuq-ue.a.run.app
+
+      - name: Smoke test
+        env:
+          SERVICE_URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          check() {
+            for i in $(seq 1 10); do
+              code=$(curl -s -o /dev/null -w '%{http_code}' "$SERVICE_URL$1" || true)
+              [ "$code" = "200" ] && echo "OK   $1" && return 0
+              echo "wait $1 (attempt $i, HTTP $code)"; sleep 6
+            done
+            echo "FAIL $1" && return 1
+          }
+          check /
+          # Through the nginx reverse proxy to the backend: catches a broken BACKEND_URL.
+          check /api/openings
